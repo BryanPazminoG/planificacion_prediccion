@@ -1,4 +1,4 @@
-import MySQLdb
+import mysql.connector
 
 # Clase de conexion a base de datos
 class Conexion:
@@ -7,17 +7,10 @@ class Conexion:
 
     def __init__(self, host, user, passwd):
         try:
-            self.db = MySQLdb.connect(host=host, user=user, passwd=passwd, charset='utf8', use_unicode=True)
-            self.cursor = self.db.cursor()
-            # convertidor de formatos
-            converter = MySQLdb.converters.conversions.copy()
-            converter[10] = str  # convert dates to strings
-            converter[252] = str  # covert bytes unicode to strings
-            converter[253] = str  # covert bytes unicode to strings
-            converter[254] = str  # covert bytes unicode to strings
-            self.db.converter = converter
+            self.db = mysql.connector.connect(host=host, user=user, passwd=passwd, charset='utf8', use_unicode=True)
+            self.cursor = self.db.cursor(dictionary=True)
 
-        except MySQLdb.Error as e:
+        except mysql.connector.Error as e:
             print('Error al conectar a la base de datos, "' + host + '"')
             exit(0)
 
@@ -25,9 +18,10 @@ class Conexion:
         try:
             # se evalua si la consulta se requiere como un diccionario o una lista de valores simple
             if dictionary:
-                self.cursor = self.db.cursor(cursorclass=MySQLdb.cursors.DictCursor)
+                self.cursor = self.db.cursor(dictionary=True)
             else:
                 self.cursor = self.db.cursor()
+
             # setear la base a utilizar
             self.cursor.execute('use ' + str(database))
 
@@ -49,7 +43,7 @@ class Conexion:
                     'data': self.cursor.fetchone()
                 }
 
-        except MySQLdb.Error as e:
+        except mysql.connector.Error as e:
             return {
                 'status': 'error',
                 'message': e.args
@@ -67,7 +61,7 @@ class Conexion:
                 'message': f"Database '{database_name}' created successfully."
             }
 
-        except MySQLdb.Error as e:
+        except mysql.connector.Error as e:
             return {
                 'status': 'error',
                 'message': e.args
@@ -82,7 +76,7 @@ class Conexion:
             self.cursor.execute(drop_table_query)
 
             # Create the new table
-            create_table_query = f"CREATE TABLE {table_name} ({', '.join(columns)});"
+            create_table_query = f"CREATE TABLE {table_name} ({columns});"
             
             print(create_table_query)
             
@@ -94,7 +88,7 @@ class Conexion:
                 'message': f"Table '{table_name}' created successfully in database '{database}'."
             }
 
-        except MySQLdb.Error as e:
+        except mysql.connector.Error as e:
             print(f"Error creating table '{table_name}' in database '{database}'.")
             print(str(e))
             return {
@@ -102,9 +96,8 @@ class Conexion:
                 'message': e.args
             }
 
-
     def is_connected(self):
-        if hasattr(self.db, 'open') and self.db.open:
+        if self.db.is_connected():
             return True
         else:
             return False
@@ -114,7 +107,6 @@ class Conexion:
         self.cursor.close()
         # cierra la conexion con la base de Datos
         self.db.close()
-
 
 
 def main():
