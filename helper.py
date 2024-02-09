@@ -2,7 +2,7 @@ import pandas as pd
 import os
 from fuzzywuzzy import fuzz
 import glob
-from extraccion import TransformProcess, LimpiezaCampus
+from extraccion import TransformProcess
 
 class PrediccionesManager:
     def __init__(self):
@@ -28,21 +28,25 @@ class PrediccionesManager:
             merged_data = pd.merge(archivo_predicciones, archivo_catalogo, on=['DEPARTAMENTO', 'CODIGO', 'ASIGNATURA'], how='inner')
 
             def calcular_multiplicacion_fila(row):
-                if row['TEORIA MINIMO'] == 0 or row['LABORATORIO MINIMO'] == 0:
+                if row['TEORIA MINIMO'] == 0 and row['LABORATORIO MINIMO'] == 0 and row['TEORIA MAXIMO'] == 0 and row['LABORATORIO MAXIMO'] == 0:
+                    observacion = 'CERO'
+                    horas = 0
+                elif row['TEORIA MINIMO'] == 0 and row['LABORATORIO MINIMO'] == 0:
                     observacion = 'MAX'
                     total_horas = row['TEORIA MAXIMO'] + row['LABORATORIO MAXIMO']
                     if total_horas >= 4:
-                        observacion = 'Division'
+                        observacion = 'MAX4'
                     horas = row['NRC_PREDICHOS_RF'] * total_horas
-                else:
+                elif row['TEORIA MAXIMO'] == 0 and row['LABORATORIO MAXIMO'] == 0:
                     observacion = 'MIN'
                     horas = row['NRC_PREDICHOS_RF'] * (row['TEORIA MINIMO'] + row['LABORATORIO MINIMO'])
+                else:
+                    observacion = 'CERO'
+                    horas = 0
                 return horas, observacion
 
             # Aplicar la función de cálculo a las columnas correspondientes y obtener las observaciones
-            merged_data['HORAS_RL'], merged_data['OBSERVACION_RL'] = zip(*merged_data.apply(lambda row: calcular_multiplicacion_fila(row), axis=1))
             merged_data['HORAS_SE'], merged_data['OBSERVACION_SE'] = zip(*merged_data.apply(lambda row: calcular_multiplicacion_fila(row), axis=1))
-            merged_data['HORAS_AD'], merged_data['OBSERVACION_AD'] = zip(*merged_data.apply(lambda row: calcular_multiplicacion_fila(row), axis=1))
 
             merged_data = merged_data.rename(columns={
                 'ESTUDIANTES_PREDICHOS_LR': 'ESTUDIANTES_RL',
@@ -54,16 +58,21 @@ class PrediccionesManager:
             })
 
             # Agrega la condición adicional para el 'DEPARTAMENTO' específico
-            division_condition = ((merged_data['OBSERVACION_AD'] == 'Division') | 
-                                (merged_data['OBSERVACION_SE'] == 'Division') | 
-                                (merged_data['OBSERVACION_RL'] == 'Division')) & (merged_data['DEPARTAMENTO'] == 'CIENCIAS DE ENERGIA Y MECANICA') & (merged_data['CAMPUS'] == 'ESPE MATRIZ SANGOLQUI')
+            division_condition = (merged_data['OBSERVACION_SE'] == 'MAX4') & (merged_data['CAMPUS'] == 'ESPE MATRIZ SANGOLQUI')
+                                #(merged_data['OBSERVACION_RL'] == 'Division')) & (merged_data['DEPARTAMENTO'] == 'CIENCIAS DE ENERGIA Y MECANICA') & (merged_data['CAMPUS'] == 'ESPE MATRIZ SANGOLQUI')
 
             merged_data.loc[division_condition, 'ESTUDIANTES_RL'] /= 2
             merged_data.loc[division_condition, 'ESTUDIANTES_SE'] /= 2
             merged_data.loc[division_condition, 'ESTUDIANTES_AD'] /= 2
             merged_data.loc[division_condition, 'CAMPUS'] = 'Campus Experimental'
+            merged_data.loc[division_condition, 'OBSERVACION_SE'] = 'Division'
+            
+            
+            # Reemplazar los valores 'MAX4' en la columna 'OBSERVACION_SE' por 'MAX'
+            merged_data['OBSERVACION_SE'] = merged_data['OBSERVACION_SE'].replace('MAX4', 'MAX')
 
-            result_data = merged_data[['CAMPUS', 'DEPARTAMENTO', 'ASIGNATURA', 'ÁREA DE CONOCIMIENTO', 'CODIGO', 'ESTUDIANTES_RL', 'ESTUDIANTES_SE', 'ESTUDIANTES_AD', 'NRC_RL', 'NRC_SE', 'NRC_AD', 'HORAS_RL', 'HORAS_SE', 'HORAS_AD', 'OBSERVACION_RL', 'OBSERVACION_SE', 'OBSERVACION_AD']]
+
+            result_data = merged_data[['CAMPUS', 'DEPARTAMENTO', 'ASIGNATURA', 'ÁREA DE CONOCIMIENTO', 'CODIGO', 'ESTUDIANTES_RL', 'ESTUDIANTES_SE', 'ESTUDIANTES_AD', 'NRC_RL', 'NRC_SE', 'NRC_AD', 'HORAS_SE', 'OBSERVACION_SE']]
 
             if division_condition.any():
                 print("Se encontraron divisiones, realizando ajustes adicionales.")
@@ -146,12 +155,12 @@ class DataframesManager:
             print(f"El archivo {df_actual} no existe. No se realizarán las operaciones.")
 
     def calcular_horas_y_observacion(self, row):
-        if row['TEORIA MINIMO'] == 0 or row['LABORATORIO MINIMO'] == 0:
+        if row['TEORIA MINIMO'] == 0 and row['LABORATORIO MINIMO'] == 0:
             total_horas = row['TEORIA MAXIMO'] + row['LABORATORIO MAXIMO']
             if total_horas >= 4:
-                return total_horas, 'Division'
+                return total_horas, 'MAX4'
             return total_horas, 'MAX'
-        else:
+        elif row['TEORIA MAXIMO'] == 0 and row['LABORATORIO MAXIMO'] == 0:
             return row['TEORIA MINIMO'] + row['LABORATORIO MINIMO'], 'MIN'
     
     def comparar_catalogo(self, no_vigente):
@@ -169,8 +178,11 @@ class DataframesManager:
         df_actual = df_actual.copy()
         df_actual.loc[:, 'HORAS'] = df_merged['HORAS'].values
         df_actual.loc[:, 'OBSERVACION'] = df_merged['OBSERVACION'].values
-        division_condition = (df_actual['OBSERVACION'] == 'Division')
+        division_condition = (df_actual['OBSERVACION'] == 'MAX4') & (df_actual['CAMPUS'] == 'ESPE MATRIZ SANGOLQUI')
         df_actual.loc[division_condition, 'CAMPUS']  = 'Campus Experimental'
+        df_actual.loc[division_condition, 'OBSERVACION']  = 'Division'
+        
+        df_actual['OBSERVACION'] = df_actual['OBSERVACION'].replace('MAX4', 'MAX')
 
         columnas_a_eliminar = ['ID DOCENTE', 'DOCENTE', '# CRED']
         no_vigente = no_vigente.drop(columnas_a_eliminar, axis=1)

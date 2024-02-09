@@ -13,19 +13,19 @@ def main():
     # Paso 2) Comparacion predicciones con catalogo.
     predicciones_manager.calcular_predicciones_catalogo("Data/Output/Prediccion/Combinado_Predicciones.xlsx", "Data/Output/Catalogo/Catalogo_Actualizado.xlsx")
 
-    # PROCESAR ARCHIVO ACTUAL SI EXISTE
-    # Paso 1) Limpiamos los datos del reporte actual.
+    # # PROCESAR ARCHIVO ACTUAL SI EXISTE
+    # # Paso 1) Limpiamos los datos del reporte actual.
     actual_manager.procesar_reporte_actual()
-    # Paso 2) Verificamos la informacion que existe con respecto al catalogo actual.
+    # # Paso 2) Verificamos la informacion que existe con respecto al catalogo actual.
     actual_manager.realizar_validacion()
     
-    # AGRUPAR DATAFRAME ACTUAL Y COMBINADO
-    # Paso 1) Agrupamos ambos dataframes
+    # # AGRUPAR DATAFRAME ACTUAL Y COMBINADO
+    # # Paso 1) Agrupamos ambos dataframes
     malla_no_vigente = dataframes_manager.unir_y_procesar_dataframes()
-    # Paso 2)
+    # # Paso 2)
     dataframes_manager.comparar_catalogo(malla_no_vigente)
     
-    # CALCULOS FINALES
+    # # CALCULOS FINALES
     dataframe_calculos.filtrar_y_guardar_excel('Data\Output\Dataframe\Dataframe_Combinado.xlsx', 'ASIGNATURA', 'Profesionalizante|Complex', 'Data\Output\Dataframe\Dataframe_Combinado.xlsx')
     dataframe_calculos.filtrar_y_guardar_excel('Data\Output\Prediccion\Dataframe_Predicciones_Calculo.xlsx', 'ASIGNATURA', 'Profesionalizante|Complex', 'Data\Output\Prediccion\Dataframe_Predicciones_Calculo.xlsx')
     dataframe_calculos.filtrar_y_guardar_excel('Data\Output\Prediccion\Dataframe_Predicciones_Calculo.xlsx', 'CAMPUS', 'ESPE EN LINEA', 'Data\Output\Prediccion\Dataframe_Predicciones_Calculo.xlsx')

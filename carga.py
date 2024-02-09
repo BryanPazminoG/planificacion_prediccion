@@ -65,11 +65,11 @@ def main():
 
         # Agregar una columna de ID incremental (PK)
         prediccion.reset_index(inplace=True)        
-        nuevos_nombres_prediccion = {'ÁREA DE CONOCIMIENTO': 'AREA_CONOCIMIENTO'}
+        nuevos_nombres_prediccion = {'index':'ID', 'ÁREA DE CONOCIMIENTO': 'AREA_CONOCIMIENTO'}
         prediccion.rename(columns=nuevos_nombres_prediccion, inplace=True)
         
         combinado.reset_index(inplace=True)
-        nuevos_nombres_combinado = {'ÁREA DE CONOCIMIENTO': 'AREA_CONOCIMIENTO', '# EST': 'NUM_EST'}
+        nuevos_nombres_combinado = {'index':'ID', 'ÁREA DE CONOCIMIENTO': 'AREA_CONOCIMIENTO', '# EST': 'NUM_EST'}
         combinado.rename(columns=nuevos_nombres_combinado, inplace=True)
 
         host, user, passwd = get_mysql_credentials_from_registry()
@@ -82,8 +82,8 @@ def main():
             set_mysql_credentials_to_registry(host, user, passwd)
 
 
-        database_name = "Planificacion_Academica"
-        table_name = "Predicciones"
+        database_name = "planificacion_Academica"
+        table_name = "predicciones"
 
         # Crear la conexión
         db_connection = Conexion(host, user, passwd)
@@ -152,7 +152,7 @@ def main():
 
         try:
             prediccion.to_sql(name=table_name, con=engine, if_exists='replace', index=False, dtype=custom_data_types)
-            combinado.to_sql(name="Combinado", con=engine, if_exists='replace', index=False, dtype=column_data_types_combinado)
+            combinado.to_sql(name="combinado", con=engine, if_exists='replace', index=False, dtype=column_data_types_combinado)
             print(f"Datos insertados en la tabla '{table_name}' y en la tabla Combinado de la base de datos '{database_name}'.")
         except Exception as e:
             print(f"Error al insertar datos en la tabla '{table_name}' de la base de datos '{database_name}': {str(e)}")

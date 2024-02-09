@@ -2,12 +2,8 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import time
-import multiprocessing
-from joblib import Parallel, delayed
 
 def main():
     ruta_archivo = "Data/Output/Dataframe/Dataframe_Combinado.xlsx"
@@ -20,7 +16,7 @@ def main():
 
     df_combinado = df_combinado.loc[df_combinado['NRC'] != df_combinado['NRC'].shift()]
 
-    # Agrupar y sumar estudiantes por asignatura, periodo y campus
+    # Agrupar y contar NRC por asignatura, periodo y campus
     estudiantes_por_asignatura_periodo_campus = df_combinado.groupby(["ASIGNATURA", "PERIODO", "CAMPUS"])["NRC"].count().reset_index()
 
     # Ordenar por campus
@@ -97,14 +93,11 @@ def main():
             'NRC_PREDICHOS_DT': predicted_students_dt[0],
         }
 
-    num_cores = multiprocessing.cpu_count()
-    num_jobs = max(1, int(num_cores * 0.8))
+    results = []
 
-    # Execute the for loop in parallel
-    results = Parallel(n_jobs=num_jobs)(
-        delayed(predict_students)(asignatura, campus, group)
-        for (asignatura, campus), group in estudiantes_por_asignatura_periodo_campus.groupby(['ASIGNATURA', 'CAMPUS'])
-    )
+    for (asignatura, campus), group in estudiantes_por_asignatura_periodo_campus.groupby(['ASIGNATURA', 'CAMPUS']):
+        result = predict_students(asignatura, campus, group)
+        results.append(result)
 
     predictions_df = pd.DataFrame(results).sort_values(by='DEPARTAMENTO').reset_index(drop=True)
 
