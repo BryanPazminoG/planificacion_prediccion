@@ -7,7 +7,7 @@ from modelos_proyeccion_nrc import main as modelos_proyeccion_nrc
 from extraccion import main as extraccion_main
 from transformacion import main as transformacion_main
 from carga import main as carga_main
-
+import configparser
 
 
 def validar_directorios():
@@ -22,14 +22,21 @@ def validar_directorios():
         "Data/Output/Prediccion",
         "Data/Reporte Actual"
     ]
+    directorios_creados = False  # Variable para registrar si se creó al menos un directorio
     for directorio in directorios:
         if not os.path.exists(directorio):
             os.makedirs(directorio)
             print(f"Directorio {directorio} creado.")
-            if "Output" in directorio:
-                print("Recuerda subir la información al directorio 'Data/Output'.")
-            return False  # Devuelve False si algún directorio no existe
-    return True  # Devuelve True si todos los directorios existen
+            directorios_creados = True  # Marcamos que se creó al menos un directorio
+
+    # Si se creó al menos un directorio, salimos de la ejecución
+    if directorios_creados:
+        print("Se crearon nuevos directorios.")
+        exit()
+
+    print("Todos los directorios ya existían. Continuando con la ejecución...")
+
+
 
             
 def ejecutar_funcion(funcion):
@@ -43,9 +50,28 @@ def ejecutar_funcion(funcion):
     except Exception as error:
         print(f"Error al ejecutar la función {funcion.__name__}: {error}")
 
+def crear_config_ini():
+    if not os.path.exists("config.ini"):
+        try:
+            config = configparser.ConfigParser()
+            config['DEFAULT'] = {
+                'host': '127.0.0.1',
+                'user': 'root',
+                'pwd': ''
+            }
+            with open("config.ini", 'w') as configfile:
+                config.write(configfile)
+            exit()  # Detener la ejecución en caso de error
+        except Exception as e:
+            print(f"Error al crear el archivo config.ini: {e}")
+            
+    else:
+        print("El archivo config.ini ya existe.")
+
 if __name__ == "__main__":
-    if not validar_directorios():
-        exit
+    
+    crear_config_ini() 
+    validar_directorios()
     ejecutar_funcion(extraccion_main)
     ejecutar_funcion(modelos_proyeccion_matriculas)
     ejecutar_funcion(modelos_proyeccion_nrc)

@@ -17,8 +17,19 @@ class TransformProcess:
         nombre_archivo = os.path.basename(self.archivo)
         periodo = nombre_archivo.split("_")[0]
         self.periodo = periodo
+
+    def convertir_periodo_a_fecha(self):
+        year_month = self.periodo[:4]
+        month_code = self.periodo[4:]
+        fecha = pd.to_datetime(year_month, format="%Y")
+        if month_code == '50':
+            fecha += pd.DateOffset(months=4)            
+        elif month_code == '51':
+            fecha += pd.DateOffset(months=9)
+        self.df['PERIODO_FECHA'] = fecha.strftime("%Y-%m-%d")
     
     def agregar_periodo(self):
+        self.convertir_periodo_a_fecha()
         self.df['PERIODO'] = self.periodo
         
     def eliminar_filas(self):
@@ -62,7 +73,7 @@ class TransformProcess:
         #self.df = self.df.loc[self.df['NRC'] != self.df['NRC'].shift()]
 
     def definir_tipos_datos(self):
-        columnas_string = {'DEPARTAMENTO', 'CAMPUS', 'ID DOCENTE', 'CÉDULA', 'DOCENTE', 'ÁREA DE CONOCIMIENTO', 'NIVEL FORMACION', 'CODIGO', 'ASIGNATURA', 'PARTE PERIODO', 'STATUS', 'SECCION' }
+        columnas_string = {'DEPARTAMENTO', 'CAMPUS', 'ID DOCENTE', 'CÉDULA', 'DOCENTE', 'ÁREA DE CONOCIMIENTO', 'NIVEL FORMACION', 'CODIGO', 'ASIGNATURA', 'PARTE PERIODO', 'STATUS', 'SECCION', 'PERIODO_FECHA' }
         columnas_integer = {'NRC', '# CRED', '# EST', 'PERIODO'}
         tipos_datos = {col: str for col in columnas_string}
         tipos_datos.update({col: pd.Int64Dtype() for col in columnas_integer})  # Utilizar el tipo de datos pd.Int64Dtype() para columnas enteras

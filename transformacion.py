@@ -17,7 +17,7 @@ def main():
     # # Paso 1) Limpiamos los datos del reporte actual.
     actual_manager.procesar_reporte_actual()
     # # Paso 2) Verificamos la informacion que existe con respecto al catalogo actual.
-    actual_manager.realizar_validacion()
+    #actual_manager.realizar_validacion()
     
     # # AGRUPAR DATAFRAME ACTUAL Y COMBINADO
     # # Paso 1) Agrupamos ambos dataframes

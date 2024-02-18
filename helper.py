@@ -15,8 +15,8 @@ class PrediccionesManager:
         merged_df = pd.merge(archivo_estudiantes, archivo_nrc, on=['ASIGNATURA', 'CAMPUS', 'DEPARTAMENTO', 'CODIGO'], how='inner')
         merged_df.to_excel(self.ruta_combinado_predicciones, index=False)
         try:
-            os.remove(matriculas_ruta)
-            os.remove(nrc_ruta)
+            #os.remove(matriculas_ruta)
+            #os.remove(nrc_ruta)
             print("Archivos originales eliminados exitosamente.")
         except Exception as e:
             print(f"Error al eliminar archivos originales: {e}")
@@ -117,6 +117,7 @@ class ActualManager:
             nombre_archivo_salida = os.path.join(self.carpeta_resultados, "Dataframe_Actual.xlsx")
             df_combinado.to_excel(nombre_archivo_salida, index=False)
             print(f"Archivo de registro: {nombre_archivo_salida}")
+            self.realizar_validacion()
         else:
             print("No hay archivos para procesar.")
             
@@ -152,7 +153,7 @@ class DataframesManager:
             df_resultado.to_excel(self.dataframe_combinado, index=False)
             return malla_no_vigente
         else:
-            print(f"El archivo {df_actual} no existe. No se realizarán las operaciones.")
+            print(f"El archivo actual no existe. No se realizarán las operaciones.")
 
     def calcular_horas_y_observacion(self, row):
         if row['TEORIA MINIMO'] == 0 and row['LABORATORIO MINIMO'] == 0:
@@ -184,11 +185,14 @@ class DataframesManager:
         
         df_actual['OBSERVACION'] = df_actual['OBSERVACION'].replace('MAX4', 'MAX')
 
-        columnas_a_eliminar = ['ID DOCENTE', 'DOCENTE', '# CRED']
-        no_vigente = no_vigente.drop(columnas_a_eliminar, axis=1)
+        if no_vigente is not None:
+            if not isinstance(no_vigente, pd.DataFrame):
+                raise ValueError("El argumento 'no_vigente' debe ser un DataFrame de pandas.")
+
+            columnas_a_eliminar = ['ID DOCENTE', 'DOCENTE', '# CRED']
+            no_vigente = no_vigente.drop(columnas_a_eliminar, axis=1)
+            df_actual = pd.concat([df_actual, no_vigente], ignore_index=True)
         
-        # Avoid in-place modifications with concat
-        df_actual = pd.concat([df_actual, no_vigente], ignore_index=True)
         df_actual.to_excel(ruta_dataframe_combinado, index=False)
         
 class Calculos:
