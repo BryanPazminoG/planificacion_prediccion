@@ -1,82 +1,87 @@
-import os
 import pandas as pd
+import numpy as np
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
+import time
 
-def calcular_predicciones_catalogo(ruta_predicciones, ruta_catalogo):
-        archivo_predicciones = pd.read_excel(ruta_predicciones)
-        archivo_catalogo = pd.read_excel(ruta_catalogo)
-        merged_data = pd.merge(archivo_predicciones, archivo_catalogo, on=['DEPARTAMENTO', 'CODIGO', 'ASIGNATURA'], how='inner')
-        
-        merged_data = merged_data.rename(columns={
-            'ESTUDIANTES_PREDICHOS_LR': 'ESTUDIANTES_RL',
-            'ESTUDIANTES_PREDICHOS_EXPONENCIAL': 'ESTUDIANTES_SE',
-            'ESTUDIANTES_PREDICHOS_DT': 'ESTUDIANTES_AD',
-            'NRC_PREDICHOS_RF': 'NRC_RL',
-            'NRC_PREDICHOS_EXPONENCIAL': 'NRC_SE',
-            'NRC_PREDICHOS_DT': 'NRC_AD',
-        })
-        
-        def calcular_multiplicacion_fila(row):
-            if row['TEORIA MINIMO'] == 0 and row['LABORATORIO MINIMO'] == 0 and row['TEORIA MAXIMO'] == 0 and row['LABORATORIO MAXIMO'] == 0:
-                observacion = 'CERO'
-                horas = 0
-            elif row['TEORIA MINIMO'] == 0 and row['LABORATORIO MINIMO'] == 0:
-                observacion = 'MAX'
-                total_horas = row['TEORIA MAXIMO'] + row['LABORATORIO MAXIMO']
-                if total_horas >= 4:
-                    observacion = 'MAX4'
-                horas = row['NRC_RL'] * total_horas
-            elif row['TEORIA MAXIMO'] == 0 and row['LABORATORIO MAXIMO'] == 0:
-                observacion = 'MIN'
-                horas = row['NRC_RL'] * (row['TEORIA MINIMO'] + row['LABORATORIO MINIMO'])
-            else:
-                observacion = 'CERO'
-                horas = 0
-            # Multiplicar las horas por los valores de NRC_RL, NRC_SE y NRC_AD
-            horas_rl = horas * row['NRC_RL']
-            horas_se = horas * row['NRC_SE']
-            horas_ad = horas * row['NRC_AD']
-            
-            return horas_rl, horas_se, horas_ad, horas, observacion
-        
-            ####return horas, observacion
-            
+ruta_archivo = "Pruebas_SisOp.xlsx"
+ruta_salida = "Prediccion_Matriculas.xlsx"
 
+def exponential_smoothing(series, alpha):
+    result = [series[0]]  # first value is same as series
+    for i in range(1, len(series)):
+        result.append(alpha * series[i] + (1 - alpha) * result[i - 1])
+    return result
 
-        # Aplicar la función de cálculo a las columnas correspondientes y obtener las observaciones
-        #####merged_data['HORAS_SE'], merged_data['OBSERVACION_SE'] = zip(*merged_data.apply(lambda row: calcular_multiplicacion_fila(row), axis=1))
-        # Aplicar la función de cálculo a las columnas correspondientes y obtener las observaciones
-        merged_data['HORAS_RL'], merged_data['HORAS_SE'], merged_data['HORAS_AD'], merged_data['HORAS_TOTALES'], merged_data['OBSERVACION_SE'] = zip(*merged_data.apply(lambda row: calcular_multiplicacion_fila(row), axis=1))
+def predict_students(asignatura, campus, group, df_combinado):
+    X = group['PERIODO'].values.reshape(-1, 1)
+    y = group['# EST'].values
+    
+    # Normalize the data
+    scaler = StandardScaler()
+    X_normalized = scaler.fit_transform(X)
 
+    # Random Forest Regression
+    model_rf = RandomForestRegressor(n_estimators=100, random_state=42)
+    model_rf.fit(X_normalized, y)
+    predicted_students_rf = model_rf.predict(X_normalized[-1].reshape(1, -1))
 
-        # Agrega la condición adicional para el 'DEPARTAMENTO' específico
-        division_condition = (merged_data['OBSERVACION_SE'] == 'MAX4') & (merged_data['CAMPUS'] == 'ESPE MATRIZ SANGOLQUI')
-                            #(merged_data['OBSERVACION_RL'] == 'Division')) & (merged_data['DEPARTAMENTO'] == 'CIENCIAS DE ENERGIA Y MECANICA') & (merged_data['CAMPUS'] == 'ESPE MATRIZ SANGOLQUI')
+    # Linear Regression
+    model_lr = LinearRegression()
+    model_lr.fit(X_normalized, y)
+    predicted_students_lr = model_lr.predict(X_normalized[-1].reshape(1, -1))
 
-        merged_data.loc[division_condition, 'ESTUDIANTES_RL'] /= 2
-        merged_data.loc[division_condition, 'ESTUDIANTES_SE'] /= 2
-        merged_data.loc[division_condition, 'ESTUDIANTES_AD'] /= 2
-        merged_data.loc[division_condition, 'CAMPUS'] = 'Campus Experimental'
-        merged_data.loc[division_condition, 'OBSERVACION_SE'] = 'Division'
-        
-        
-        # Reemplazar los valores 'MAX4' en la columna 'OBSERVACION_SE' por 'MAX'
-        merged_data['OBSERVACION_SE'] = merged_data['OBSERVACION_SE'].replace('MAX4', 'MAX')
+    # Exponential Smoothing
+    alpha = 0.3
+    smoothed_students = exponential_smoothing(y, alpha)
+    predicted_students_exponential = alpha * y[-1] + (1 - alpha) * smoothed_students[-1]
 
+    next_period = df_combinado['PERIODO'].max() + 1
+    next_period_normalized = scaler.transform([[next_period]])
+    predicted_students_rf = model_rf.predict(next_period_normalized)
+    predicted_students_lr = model_lr.predict(next_period_normalized)
 
-        #result_data = merged_data[['CAMPUS', 'DEPARTAMENTO', 'ASIGNATURA', 'ÁREA DE CONOCIMIENTO', 'CODIGO', 'ESTUDIANTES_RL', 'ESTUDIANTES_SE', 'ESTUDIANTES_AD', 'NRC_RL', 'NRC_SE', 'NRC_AD', 'HORAS_SE', 'OBSERVACION_SE']]
-        result_data = merged_data[['CAMPUS', 'DEPARTAMENTO', 'ASIGNATURA', 'ÁREA DE CONOCIMIENTO', 'CODIGO', 'ESTUDIANTES_RL', 'ESTUDIANTES_SE', 'ESTUDIANTES_AD', 'NRC_RL', 'NRC_SE', 'NRC_AD', 'HORAS_RL', 'HORAS_SE', 'HORAS_AD', 'HORAS_TOTALES', 'OBSERVACION_SE']]
-        
-        if division_condition.any():
-            print("Se encontraron divisiones, realizando ajustes adicionales.")
+    department = df_combinado.loc[(df_combinado['ASIGNATURA'] == asignatura) & (df_combinado['CAMPUS'] == campus), 'DEPARTAMENTO'].iloc[0]
+    codigo = df_combinado.loc[(df_combinado['ASIGNATURA'] == asignatura) & (df_combinado['CAMPUS'] == campus), 'CODIGO'].iloc[0]
 
-        ruta_salida = ruta_predicciones.replace('.xlsx', '_resultado.xlsx')
-        result_data.to_excel(ruta_salida, index=False)
+    return {
+        'CAMPUS': campus,
+        'DEPARTAMENTO': department,
+        'ASIGNATURA': asignatura,
+        'CODIGO': codigo,
+        'ESTUDIANTES_PREDICHOS_DT': predicted_students_rf[0],
+        'ESTUDIANTES_PREDICHOS_LR': predicted_students_lr[0],
+        'ESTUDIANTES_PREDICHOS_EXPONENCIAL': predicted_students_exponential
+    }
 
-        try:
-            #os.remove(ruta_predicciones)
-            print("Archivo original de predicciones eliminado exitosamente.")
-        except Exception as e:
-            print(f"Error al eliminar el archivo original de predicciones: {e}")
-            
-            
-calcular_predicciones_catalogo("Combinado_Predicciones.xlsx", "Data\Output\Catalogo\Catalogo_Actualizado.xlsx")
+def main():
+    start_time = time.time()
+
+    df_combinado = pd.read_excel(ruta_archivo)
+
+    df_combinado = df_combinado.loc[df_combinado['NRC'] != df_combinado['NRC'].shift()]
+
+    estudiantes_por_asignatura_periodo_campus = df_combinado.groupby(["ASIGNATURA", "PERIODO", "CAMPUS"])["# EST"].sum().reset_index()
+
+    results = []
+
+    ultimas_predicciones = {}
+
+    for (asignatura, campus), group in estudiantes_por_asignatura_periodo_campus.groupby(['ASIGNATURA', 'CAMPUS']):
+        result = predict_students(asignatura, campus, group, df_combinado)
+        ultimas_predicciones[(asignatura, campus)] = result
+
+    # Convierte el diccionario de últimas predicciones en una lista para guardar en el DataFrame
+    results = list(ultimas_predicciones.values())
+
+    results = pd.DataFrame(results).sort_values(by='DEPARTAMENTO').reset_index(drop=True)
+
+    results.to_excel(ruta_salida, index=False)
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print("Tiempo de ejecución:", execution_time, "segundos")
+
+if __name__ == "__main__":
+    main()

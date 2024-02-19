@@ -15,8 +15,8 @@ class PrediccionesManager:
         merged_df = pd.merge(archivo_estudiantes, archivo_nrc, on=['ASIGNATURA', 'CAMPUS', 'DEPARTAMENTO', 'CODIGO'], how='inner')
         merged_df.to_excel(self.ruta_combinado_predicciones, index=False)
         try:
-            #os.remove(matriculas_ruta)
-            #os.remove(nrc_ruta)
+            os.remove(matriculas_ruta)
+            os.remove(nrc_ruta)
             print("Archivos originales eliminados exitosamente.")
         except Exception as e:
             print(f"Error al eliminar archivos originales: {e}")
@@ -28,25 +28,37 @@ class PrediccionesManager:
             merged_data = pd.merge(archivo_predicciones, archivo_catalogo, on=['DEPARTAMENTO', 'CODIGO', 'ASIGNATURA'], how='inner')
 
             def calcular_multiplicacion_fila(row):
-                if row['TEORIA MINIMO'] == 0 and row['LABORATORIO MINIMO'] == 0 and row['TEORIA MAXIMO'] == 0 and row['LABORATORIO MAXIMO'] == 0:
+                teoria_maximo = row['TEORIA MAXIMO']
+                laboratorio_maximo = row['LABORATORIO MAXIMO']
+                teoria_minimo = row['TEORIA MINIMO']
+                laboratorio_minimo = row['LABORATORIO MINIMO']
+
+                nrc_rf = row['NRC_PREDICHOS_RF']
+                nrc_se = row['NRC_PREDICHOS_EXPONENCIAL']
+                nrc_dt = row['NRC_PREDICHOS_DT']
+
+                if teoria_minimo == 0 and laboratorio_minimo == 0 and teoria_maximo == 0 and laboratorio_maximo == 0:
                     observacion = 'CERO'
                     horas = 0
-                elif row['TEORIA MINIMO'] == 0 and row['LABORATORIO MINIMO'] == 0:
+                elif teoria_minimo == 0 and laboratorio_minimo == 0:
                     observacion = 'MAX'
-                    total_horas = row['TEORIA MAXIMO'] + row['LABORATORIO MAXIMO']
+                    total_horas = teoria_maximo + laboratorio_maximo
                     if total_horas >= 4:
                         observacion = 'MAX4'
-                    horas = row['NRC_PREDICHOS_RF'] * total_horas
-                elif row['TEORIA MAXIMO'] == 0 and row['LABORATORIO MAXIMO'] == 0:
+                    horas_rf = nrc_rf * total_horas
+                    horas_se = nrc_se * total_horas
+                    horas_dt = nrc_dt * total_horas
+                elif teoria_maximo == 0 and laboratorio_maximo == 0:
                     observacion = 'MIN'
-                    horas = row['NRC_PREDICHOS_RF'] * (row['TEORIA MINIMO'] + row['LABORATORIO MINIMO'])
-                else:
-                    observacion = 'CERO'
-                    horas = 0
-                return horas, observacion
+                    horas_rf = nrc_rf * (teoria_minimo + laboratorio_minimo)
+                    horas_se = nrc_se * (teoria_minimo + laboratorio_minimo)
+                    horas_dt = nrc_dt * (teoria_minimo + laboratorio_minimo)
 
-            # Aplicar la función de cálculo a las columnas correspondientes y obtener las observaciones
-            merged_data['HORAS_SE'], merged_data['OBSERVACION_SE'] = zip(*merged_data.apply(lambda row: calcular_multiplicacion_fila(row), axis=1))
+            
+                return observacion, horas_rf, horas_se, horas_dt
+
+            merged_data['OBSERVACION'], merged_data['HORAS_RF'], merged_data['HORAS_SE'], merged_data['HORAS_DT'] = zip(*merged_data.apply(lambda row: calcular_multiplicacion_fila(row), axis=1))
+
 
             merged_data = merged_data.rename(columns={
                 'ESTUDIANTES_PREDICHOS_LR': 'ESTUDIANTES_RL',
@@ -58,26 +70,28 @@ class PrediccionesManager:
             })
 
             # Agrega la condición adicional para el 'DEPARTAMENTO' específico
-            division_condition = (merged_data['OBSERVACION_SE'] == 'MAX4') & (merged_data['CAMPUS'] == 'ESPE MATRIZ SANGOLQUI')
+            division_condition = (merged_data['OBSERVACION'] == 'MAX4') & (merged_data['CAMPUS'] == 'ESPE MATRIZ SANGOLQUI')
                                 #(merged_data['OBSERVACION_RL'] == 'Division')) & (merged_data['DEPARTAMENTO'] == 'CIENCIAS DE ENERGIA Y MECANICA') & (merged_data['CAMPUS'] == 'ESPE MATRIZ SANGOLQUI')
 
             merged_data.loc[division_condition, 'ESTUDIANTES_RL'] /= 2
             merged_data.loc[division_condition, 'ESTUDIANTES_SE'] /= 2
             merged_data.loc[division_condition, 'ESTUDIANTES_AD'] /= 2
             merged_data.loc[division_condition, 'CAMPUS'] = 'Campus Experimental'
-            merged_data.loc[division_condition, 'OBSERVACION_SE'] = 'Division'
+            merged_data.loc[division_condition, 'OBSERVACION'] = 'Division'
             
             
             # Reemplazar los valores 'MAX4' en la columna 'OBSERVACION_SE' por 'MAX'
-            merged_data['OBSERVACION_SE'] = merged_data['OBSERVACION_SE'].replace('MAX4', 'MAX')
+            merged_data['OBSERVACION'] = merged_data['OBSERVACION'].replace('MAX4', 'MAX')
 
 
-            result_data = merged_data[['CAMPUS', 'DEPARTAMENTO', 'ASIGNATURA', 'ÁREA DE CONOCIMIENTO', 'CODIGO', 'ESTUDIANTES_RL', 'ESTUDIANTES_SE', 'ESTUDIANTES_AD', 'NRC_RL', 'NRC_SE', 'NRC_AD', 'HORAS_SE', 'OBSERVACION_SE']]
+            result_data = merged_data[['CAMPUS', 'DEPARTAMENTO', 'ASIGNATURA', 'ÁREA DE CONOCIMIENTO', 'CODIGO', 'ÁREA DE CONOCIMIENTO', 'ESTUDIANTES_RL', 'ESTUDIANTES_SE', 'ESTUDIANTES_AD', 'NRC_RL', 'NRC_SE', 'NRC_AD', 'HORAS_RF','HORAS_SE', 'HORAS_DT', 'OBSERVACION']]
 
             if division_condition.any():
                 print("Se encontraron divisiones, realizando ajustes adicionales.")
 
-            result_data.to_excel(self.ruta_combinado_calculo, index=False)
+            # Correct the output file path and specify the file format
+            output_file = "Combinado_Predicciones_Output.xlsx"
+            result_data.to_excel(output_file, index=False)
             try:
                 os.remove(ruta_predicciones)
                 print("Archivo original de predicciones eliminado exitosamente.")
